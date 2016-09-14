@@ -20,6 +20,11 @@ nla_wq <- read.csv(nla_wq_url, stringsAsFactors = FALSE)
 nla_secchi <- read.csv(nla_secchi_url, stringsAsFactor = FALSE)
 ```
 
+### Challenge
+1. Make sure you have both nla_wq and nla_secchi data.frames read in successfully.
+2. How many rows are in nla_wq?  
+3. How many rows are in nla_secchi?
+4. Using `names()` list out the column names to your screen.  
 
 ## Clean Data
 So this dataset is a bit bigger than we probably want, let's do some clean up using `dplyr`.  We want to select out a few columns, filter out the data that we want and get our data.frame ready for futher analysis.
@@ -66,6 +71,9 @@ tbl_df(nla)
 ```
 
 So now we have a dataset ready for analysis.
+
+### Challenge
+1. Using `filter()` and `select()` see if you can create a new data frame that has just NTL and PTL for the state of Rhode Island.
 
 ## Analyze Data
 
@@ -185,6 +193,77 @@ mean(x, na.rm = TRUE) #Returns mean of 37, 22, 41, and 19
 ## [1] 29.75
 ```
 
+It is also useful to be able to return some basic counts for different groups.  For instance, how many lakes in the NLA were natural and how many were man made.
+
+
+```r
+#The table() funciton is usefule for returning counts
+table(nla$LAKE_ORIGIN)
+```
+
+```
+## 
+## MAN-MADE  NATURAL 
+##      568      406
+```
+
+The `table()` function is also useful for looking at multiple columns at once.  A contrived example of that:
+
+
+```r
+x <- c(1,1,0,0,1,1,0,0,1,0,1,1)
+y <- c(1,1,0,0,1,0,1,0,1,0,0,0)
+xy_tab <- table(x,y)
+prop.table(xy_tab)
+```
+
+```
+##    y
+## x            0          1
+##   0 0.33333333 0.08333333
+##   1 0.25000000 0.33333333
+```
+
+Lastly, we can combine these with some `dplyr` and get summary stats for groups.  
+
+
+```r
+orig_stats_ntl <- nla %>%
+  group_by(LAKE_ORIGIN) %>%
+  summarize(mean_ntl = mean(NTL),
+            median_ntl = median(NTL),
+            sd_ntl = sd(NTL))
+orig_stats_ntl
+```
+
+```
+## Source: local data frame [2 x 4]
+## 
+##   LAKE_ORIGIN  mean_ntl median_ntl    sd_ntl
+##         <chr>     <dbl>      <dbl>     <dbl>
+## 1    MAN-MADE  842.8644      544.5  961.5889
+## 2     NATURAL 1676.7709      688.0 3019.7433
+```
+
+And, just because it is cool, a markdown table!
+
+
+```r
+knitr::kable(orig_stats_ntl)
+```
+
+
+
+|LAKE_ORIGIN |  mean_ntl| median_ntl|    sd_ntl|
+|:-----------|---------:|----------:|---------:|
+|MAN-MADE    |  842.8644|      544.5|  961.5889|
+|NATURAL     | 1676.7709|      688.0| 3019.7433|
+
+### Challenge
+1.) Look at some of the basic stats for other columns in our data.  What is the standard deviation for PTL?  What is the median Secchi depth?  Play around with others.
+2.) Using some `dplyr` magic, let's look at mean Secchi by reference class (RT_NLA). 
+3.) The `quantile()` function allows greater control over getting different quantiles of your data.  For instance you can use it to get the min, median and max with `quantile(nla$NTL, probs = c(0,0.5,1))`.  Re-write this function to return the 33 and 66 quantiles.
+
 ### Some quick useful viz
 
 While visualization isn't the point of this lesson, some things are useful to do at this stage of analysis.  In particular is looking at distributions and some basic scatterplots.
@@ -212,7 +291,6 @@ plot(density(log1p(nla$NTL)))
 ```
 
 ![plot of chunk histogram_density](figure/histogram_density-3.png)
-
 
 And boxplots:
 
@@ -287,6 +365,10 @@ ggplot(nla, aes(x=log1p(PTL),y=log1p(NTL))) +
 
 ![plot of chunk fancy_matrix](figure/fancy_matrix-1.png)
 
+### Challenge
+1. Build a scatterplot that looks at the relationship between PTL and NTL.  
+2. Build a boxplot that shows a boxplot of secchi by the reference class (RT_NLA)/
+
 ## Some tests: t-test and ANOVA
 There are way more tests than we can show examples for.  For today we will show two very common and straightforward tests.  The t-test and an ANOVA.
 
@@ -337,7 +419,7 @@ t.test(wide_nla$man_made, wide_nla$natural)
 Same results, two different ways to approach.  Take a look at the help (e.g. `?t.test`) for more details on other types of t-tests (e.g. paired, one-tailed, etc.)
 
 ### ANOVA
-ANOVA can get involved quickly and I haven't done them since my last stats class, so I'm not the best to talk about these, but the very basics require fitting a model and wrapping that ins `aov` function.  In the [Getting More Help section](#getting-more-help) I provide a link that would be a good first start for you ANOVA junkies.  For todays lesson though, lets look at the simple case of a one-vay analysis of variance and check if reference class results in differences in our chlorophyll
+ANOVA can get involved quickly and I haven't done them since my last stats class, so I'm not the best to talk about these, but the very basics require fitting a model and wrapping that in the `aov` function.  In the [Getting More Help section](#getting-more-help) I provide a link that would be a good first start for you ANOVA junkies.  For today's lesson though, lets look at the simple case of a one-vay analysis of variance and check if reference class results in differences in our chlorophyll
 
 
 ```r
@@ -392,7 +474,6 @@ anova(nla_anova) #The table with a bit more
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
-
 
 ## Correlations and Linear modeling
 The last bit of basic stats we will cover is going to be linear relationships.
@@ -948,6 +1029,9 @@ summary(chla_tp_tn_turb)
 ```
 
 There's a lot more we can do with linear models including dummy variables (character or factors will work), interactions, etc.  That's a bit more than we want to get into.  Again the link below is a good place to start for more info.
+
+### Challenge
+1. Use `lm()` to look at using secchi depth to predict chlorophyll.
 
 ## Getting More Help
 One nice site that covers basic stats in R is [Quick R: Basic Statistics](http://www.statmethods.net/stats/index.html).  There are others, but that is a good first stop.
