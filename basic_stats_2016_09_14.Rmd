@@ -1,0 +1,221 @@
+---
+title: "rhodyRstats: Basic Statistics with R"
+---
+
+# Introduction
+This notebook will cover calculating basic statistics with R, conducting statistical tests, and building simple linear models.  We will use the 2007 NLA data for the examples and show steps from getting data, to cleaning data, to analysis and statistics.
+
+## Get Data
+First step in any project will be getting the data read into R.  For this lesson we are using the 2007 National Lakes Assessment data, which ,luckily, can be accessed directly from a URL.  
+
+```{r get_nla_data, message=FALSE, warning=FALSE}
+# URL for 2007 NLA water quality data
+nla_wq_url <- "https://www.epa.gov/sites/production/files/2014-10/nla2007_chemical_conditionestimates_20091123.csv"
+
+nla_secchi_url <- "https://www.epa.gov/sites/production/files/2014-10/nla2007_secchi_20091008.csv"
+
+# Read into an R data.frame with read.csv
+nla_wq <- read.csv(nla_wq_url, stringsAsFactors = FALSE)
+nla_secchi <- read.csv(nla_secchi_url, stringsAsFactor = FALSE)
+```
+
+
+## Clean Data
+So this dataset is a bit bigger than we probably want, let's do some clean up using `dplyr`.  We want to select out a few columns, filter out the data that we want and get our data.frame ready for futher analysis.
+
+```{r clean_nla_data, message=FALSE, warning=FALSE}
+#Load dplyr into current session
+library(dplyr)
+
+#Clean up NLA Water quality
+nla_wq_cln <- nla_wq %>%
+  filter(VISIT_NO == 1,
+         SITE_TYPE == "PROB_Lake") %>%
+  select(SITE_ID,ST,EPA_REG,RT_NLA,LAKE_ORIGIN,PTL,NTL,TURB,CHLA)
+
+#Clean up NLA Secchi
+nla_secchi_cln <- nla_secchi %>%
+  filter(VISIT_NO == 1) %>%
+  select(SITE_ID, SECMEAN)
+
+#Join the two together based on SITE_ID and the finally filter out NA's
+nla <- left_join(x = nla_wq_cln, y = nla_secchi_cln, by = "SITE_ID") %>%
+  filter(complete.cases(NTL,PTL,TURB,CHLA,SECMEAN))
+tbl_df(nla)
+```
+
+So now we have a dataset ready for analysis.
+
+## Analyze Data
+
+### Basic Stats
+First step in analyzing a dataset like this is going to be to dig through some basic statistics as well as some basic plots.  
+
+We can get a summary of the full data frame:
+
+```{r summary, message=FALSE, warning=FALSE}
+#Get a summary of the data frame
+summary(nla)
+```
+
+Or, we can pick and choose what stats we want.  For instance:
+
+```{r individual_stats, message=FALSE, warning=FALSE}
+#Stats for Total Nitrogen
+mean(nla$NTL)
+median(nla$NTL)
+min(nla$NTL)
+max(nla$NTL)
+sd(nla$NTL)
+IQR(nla$NTL)
+range(nla$NTL)
+```
+
+In these cases we took care of our NA values during our data clean up, but there may be reasons you would not want to do that.  If you retained NA values, you would need to think about how to handle those.  One way is to remove it from the calculation of the statistics using the `na.rm = TRUE` argument.  For instance:
+
+```{r na_rm, message=FALSE, warning=FALSE}
+#An example with NA's
+x <- c(37,22,NA,41,19)
+mean(x) #Returns NA
+mean(x, na.rm = TRUE) #Returns mean of 37, 22, 41, and 19
+```
+
+### Some quick useful viz
+
+While visualization isn't the point of this lesson, some things are useful to do at this stage of analysis.  In particular is looking at distributions and some basic scatterplots.
+
+We can look at histograms and density:
+
+```{r histogram_density, message=FALSE, warning=FALSE}
+#A single histogram using base
+hist(nla$NTL)
+#Log transform it
+hist(log1p(nla$NTL)) #log1p adds one to deal with zeros
+#Density plot
+plot(density(log1p(nla$NTL)))
+```
+
+
+And boxplots:
+
+```{r boxplots, message=FALSE, warning=FALSE}
+#Simple boxplots
+boxplot(nla$CHLA)
+boxplot(log1p(nla$CHLA))
+
+#Boxplots per group
+boxplot(log1p(nla$CHLA)~nla$EPA_REG)
+```
+
+And scatterplots:
+
+```{r scatterplots, message=FALSE, warning=FALSE}
+#A single scatterplot
+plot(log1p(nla$PTL),log1p(nla$CHLA))
+#A matrix of scatterplot
+plot(log1p(nla[,6:10]))
+```
+
+
+Lastly, it might be nice to look at these on a per variable basis or on some grouping variable. First we could look at the density of each measured variable. This requires some manipulation of the data which will allow us to use facets in ggplot to create a density distribution for each of the variables.
+
+```{r fancy_density, message=FALSE, warning=FALSE}
+#Getting super fancy with tidyr, plotly, and ggplot2 to visualize all variables
+library(tidyr)
+library(ggplot2)
+library(plotly)
+nla_gather <- gather(nla,parameter,value,6:10)
+dens_gg <-ggplot(nla_gather,aes(x=log1p(value))) +
+  geom_density() +
+  facet_wrap("parameter") +
+  labs(x="log1p of measured value")
+ggplotly(dens_gg)
+```
+
+Next we could look at a scatterplot matrix of the relationship between phosphorus and chlorophyl by each EPA Region.  No need to re-do the shape of the data frame for this one.
+
+```{r fancy_matrix, message=FALSE, warning=FALSE}
+ggplot(nla, aes(x=log1p(PTL),y=log1p(NTL))) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap("EPA_REG")
+```
+
+## Some tests: t-test and ANOVA
+There are way more tests than we can show examples for.  For today we will show two very common and straightforward tests.  The t-test and an ANOVA.
+
+### t-test
+First we will look at the t-test to test and see if `LAKE_ORIGIN` shows a difference in `SECMEAN`.  In other words can we expect a difference in clarity due to whether a lake is man-made or natural.  This is a two-tailed test. There are two approaches for this 1) using the formula notation if your dataset is in a "long" format or 2) using two separate vectors if your dataset is in a "wide" format.
+
+```{r t-test, message=FALSE, warning=FALSE}
+#Long Format - original format for LAKE_ORIGIN and SECMEAN
+t.test(nla$SECMEAN ~ nla$LAKE_ORIGIN)
+
+#Wide Format - need to do some work to get there - tidyr is handy!
+wide_nla <- spread(nla,LAKE_ORIGIN,SECMEAN)
+names(wide_nla)[9:10]<-c("man_made", "natural")
+t.test(wide_nla$man_made, wide_nla$natural)
+```
+
+Same results, two different ways to approach.  Take a look at the help (e.g. `?t.test`) for more details on other types of t-tests (e.g. paired, one-tailed, etc.)
+
+### ANOVA
+ANOVA can get involved quickly and I haven't done them since my last stats class, so I'm not the best to talk about these, but the very basics require fitting a model and wrapping that ins `aov` function.  In the [Getting More Help section](#getting-more-help) I provide a link that would be a good first start for you ANOVA junkies.  For todays lesson though, lets look at the simple case of a one-vay analysis of variance and check if reference class results in differences in our chlorophyll
+
+```{r simple_anova, message=FALSE, warning=FALSE}
+# A quick visual of this:
+boxplot(log1p(nla$CHLA)~nla$RT_NLA)
+
+# One way analysis of variance
+nla_anova <- aov(log1p(CHLA)~RT_NLA, data=nla)
+nla_anova #Terms
+summary(nla_anova) #The table
+anova(nla_anova) #The table with a bit more
+```
+
+
+## Correlations and Linear modeling
+The last bit of basic stats we will cover is going to be linear relationships.
+
+### Correlations
+Let's first take a look at correlations.  These can be done with `cor()`.
+
+```{r cor, message=FALSE, warning=FALSE}
+#For a pair
+cor(log1p(nla$PTL),log1p(nla$NTL))
+#For a correlation matrix
+cor(log1p(nla[,6:10]))
+#Spearman Rank Correlations
+cor(log1p(nla[,6:10]),method = "spearman")
+```
+
+You can also test for differences using:
+
+```{r cor_test, message=FALSE,warning=FALSE}
+cor.test(log1p(nla$PTL),log1p(nla$NTL))
+```
+
+### Linear models
+Basic linear models in R can be built with the `lm()` function.  If you aren't buiding stadard least squares regressin models, (e.g. logistic) or aren't doing linear models then you will need to look elsewhere (e.g `glm()`, or `nls()`).  For today our focus is going to be on simple linear models.  Let's look at our ability to model chlorophyll, given the other variables we have.
+
+```{r}
+# The simplest case
+chla_tp <- lm(log1p(CHLA) ~ log1p(PTL), data=nla) #Creates the model
+summary(chla_tp) #Basic Summary
+names(chla_tp) #The bits
+chla_tp$coefficients #My preference
+coef(chla_tp) #Same thing, but from a function
+resid(chla_tp) # The resdiuals
+```
+
+We can also do multiple linear regression.
+
+```{r multiple, warning=FALSE, message=FALSE}
+chla_tp_tn_turb <- lm(log1p(CHLA) ~ log1p(PTL) + log1p(NTL) + log1p(TURB), data = nla)
+summary(chla_tp_tn_turb)
+```
+
+There's a lot more we can do with linear models including dummy variables (character or factors will work), interactions, etc.  That's a bit more than we want to get into.  Again the link below is a good place to start for more info.
+
+## Getting More Help
+One nice site that covers basic stats in R is [Quick R: Basic Statistics](http://www.statmethods.net/stats/index.html).  There are others, but that is a good first stop.
