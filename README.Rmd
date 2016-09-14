@@ -123,9 +123,9 @@ knitr::kable(orig_stats_ntl)
 ```
 
 ### Challenge
-1.) Look at some of the basic stats for other columns in our data.  What is the standard deviation for PTL?  What is the median Secchi depth?  Play around with others.
-2.) Using some `dplyr` magic, let's look at mean Secchi by reference class (RT_NLA). 
-3.) The `quantile()` function allows greater control over getting different quantiles of your data.  For instance you can use it to get the min, median and max with `quantile(nla$NTL, probs = c(0,0.5,1))`.  Re-write this function to return the 33 and 66 quantiles.
+1. Look at some of the basic stats for other columns in our data.  What is the standard deviation for PTL?  What is the median Secchi depth?  Play around with others.
+2. Using some `dplyr` magic, let's look at mean Secchi by reference class (RT_NLA). 
+3. The `quantile()` function allows greater control over getting different quantiles of your data.  For instance you can use it to get the min, median and max with `quantile(nla$NTL, probs = c(0,0.5,1))`.  Re-write this function to return the 33 and 66 quantiles.
 
 ### Some quick useful viz
 
@@ -254,7 +254,7 @@ summary(chla_tp) #Basic Summary
 names(chla_tp) #The bits
 chla_tp$coefficients #My preference
 coef(chla_tp) #Same thing, but from a function
-resid(chla_tp) # The resdiuals
+head(resid(chla_tp)) # The resdiuals
 ```
 
 We can also do multiple linear regression.
