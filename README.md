@@ -214,6 +214,17 @@ The `table()` function is also useful for looking at multiple columns at once.  
 x <- c(1,1,0,0,1,1,0,0,1,0,1,1)
 y <- c(1,1,0,0,1,0,1,0,1,0,0,0)
 xy_tab <- table(x,y)
+xy_tab
+```
+
+```
+##    y
+## x   0 1
+##   0 4 1
+##   1 3 4
+```
+
+```r
 prop.table(xy_tab)
 ```
 
